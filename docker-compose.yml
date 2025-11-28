@@ -38,7 +38,7 @@ services:
     container_name: main_proxy
     ports:
       - "10.0.0.235:80:80"
-      - "10.0.0.235:443:443"
+      - "10.0.0.235:8443:443" # changed to avoid DSM conflict
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/certs:/etc/nginx/certs
