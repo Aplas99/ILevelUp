@@ -374,13 +374,10 @@ const defaultPlayer = {
   hp: 100,
   maxHp: 100,
   fatigue: 0,
-  stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, PRS: 10 },
+  stats: { STR: 0, AGI: 0, VIT: 0, INT: 0, PRS: 0 },
 };
 
-const defaultTasks: Task[] = [
-  { id: 1, title: "Mock Task 1", type: "STR", completed: false },
-  { id: 2, title: "Mock Task 2", type: "INT", completed: false },
-];
+const defaultTasks: Task[] = [];
 
 const App = () => {
   const [player, setPlayer] = useState(defaultPlayer);
