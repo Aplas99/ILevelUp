@@ -13,11 +13,10 @@ import {
 } from "lucide-react";
 
 // --- Configuration ---
-// Setting API_BASE_URL back to include '/api' based on the required endpoint structure.
 const API_BASE_URL = "http://localhost:3000/api";
-const USER_ID = "Player1"; // Matches the user initialized in the backend DB schema
+const USER_ID = "Player1";
 
-// --- Type Definitions (Added back for clarity) ---
+// --- Type Definitions ---
 interface Stats {
   STR: number;
   AGI: number;
@@ -39,56 +38,74 @@ interface HistoryEntry {
   total: number;
 }
 
-// --- Utility for Robust API Response Handling ---
+// --- FIXED Missing Prop Types ---
+interface ProgressBarProps {
+  value: number;
+  max: number;
+  color: string;
+  label: string;
+  showValue?: boolean;
+}
+
+interface StatRowProps {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  value: number;
+  color: string;
+}
+
+interface NotificationToastProps {
+  title: string;
+  message: string;
+  type: string;
+  onClose: () => void;
+}
+
+interface TaskItemProps {
+  task: Task;
+  onComplete: (id: number) => void;
+  onDelete: (id: number) => void;
+}
+
+interface CalendarProps {
+  history: HistoryEntry[];
+}
+
+// --- Utility ---
 const handleResponse = async (response: Response) => {
-  // 1. Check for expected statuses (e.g., 200 OK)
   if (response.ok) {
-    // Read body as text first to handle empty responses
     const text = await response.text();
-    if (!text.trim() && response.status === 204) {
-      return null; // Empty body for 204 No Content
-    }
-    if (!text.trim()) {
-      // Log a warning if it's a 200 but the body is empty
-      console.warn(
-        `Server returned status ${response.status} (OK) but the response body was empty.`
-      );
-      return null;
-    }
+    if (!text.trim()) return null;
 
     try {
       return JSON.parse(text);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
-      console.error("JSON Parsing failed for text:", text);
-      // This is the source of the user's reported error.
       throw new Error(
-        `JSON.parse failed. Received text starts with: ${text.substring(
-          0,
-          100
-        )}...`
+        `JSON.parse failed. Response starts with: ${text.substring(0, 100)}...`
       );
     }
   }
 
-  // 2. Handle non-OK statuses (4xx, 5xx)
   const errorText = await response.text();
 
-  // Explicitly handle 404 for initialization
-  if (response.status === 404) {
-    return null; // Indicate data not found, let caller decide on default/initialization
-  }
+  if (response.status === 404) return null;
 
-  // Throw a detailed error for other problems
   throw new Error(
     `API returned status ${
       response.status
-    }. Response body starts with: ${errorText.substring(0, 100)}...`
+    }. Body starts with: ${errorText.substring(0, 100)}...`
   );
 };
 
 // --- Components ---
-
-const ProgressBar = ({ value, max, color, label, showValue = true }) => {
+const ProgressBar: React.FC<ProgressBarProps> = ({
+  value,
+  max,
+  color,
+  label,
+  showValue = true,
+}) => {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
 
   return (
@@ -113,7 +130,12 @@ const ProgressBar = ({ value, max, color, label, showValue = true }) => {
   );
 };
 
-const StatRow = ({ icon: Icon, label, value, color }) => (
+const StatRow: React.FC<StatRowProps> = ({
+  icon: Icon,
+  label,
+  value,
+  color,
+}) => (
   <div className="flex items-center justify-between mb-3 p-2 bg-slate-900/50 border-l-2 border-slate-700 hover:bg-slate-800/50 transition-colors">
     <div className="flex items-center gap-3">
       <Icon size={18} className={color} />
@@ -127,7 +149,12 @@ const StatRow = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
-const NotificationToast = ({ title, message, type, onClose }) => {
+const NotificationToast: React.FC<NotificationToastProps> = ({
+  title,
+  message,
+  type,
+  onClose,
+}) => {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
@@ -144,18 +171,10 @@ const NotificationToast = ({ title, message, type, onClose }) => {
           <h3 className="text-white font-bold text-xl mb-1">{title}</h3>
           <p className="text-blue-200 text-sm">{message}</p>
         </div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-blue-500"></div>
-        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-blue-500"></div>
       </div>
     </div>
   );
 };
-
-interface TaskItemProps {
-  task: Task;
-  onComplete: (id: number) => void;
-  onDelete: (id: number) => void;
-}
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onComplete, onDelete }) => {
   const getIcon = (type: keyof Stats) => {
@@ -185,7 +204,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onComplete, onDelete }) => {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded bg-slate-900 text-blue-400`}>
+          <div className="p-2 rounded bg-slate-900 text-blue-400">
             {getIcon(task.type)}
           </div>
           <div>
@@ -223,10 +242,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onComplete, onDelete }) => {
   );
 };
 
-interface CalendarProps {
-  history: HistoryEntry[];
-}
-
 const Calendar: React.FC<CalendarProps> = ({ history }) => {
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -234,24 +249,25 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
 
   const getDaysInMonth = (year: number, month: number) =>
     new Date(year, month + 1, 0).getDate();
+
   const getFirstDayOfMonth = (year: number, month: number) =>
     new Date(year, month, 1).getDay();
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
 
-  const days = [];
+  const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
   const getDayStatus = (day: number | null) => {
     if (!day) return "empty";
 
-    // Format date as YYYY-MM-DD to match history
     const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(
       2,
       "0"
     )}-${String(day).padStart(2, "0")}`;
+
     const entry = history.find((h) => h.date === dateStr);
 
     const isToday =
@@ -259,13 +275,12 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
     const isPast = day < today.getDate() || currentMonth < today.getMonth();
 
     if (entry) {
-      // NOTE: This logic assumes 'completed' and 'total' fields are available in history entries
-      if (entry.completed >= entry.total && entry.total > 0) return "complete"; // Green
-      return "fail"; // Red (incomplete)
+      if (entry.completed >= entry.total && entry.total > 0) return "complete";
+      return "fail";
     }
 
     if (isToday) return "today";
-    if (isPast) return "missed"; // Dark Red (no record in past)
+    if (isPast) return "missed";
     return "future";
   };
 
@@ -273,7 +288,7 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
     <div className="bg-slate-900/40 p-6 border border-slate-800 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
         <h2 className="text-sm font-bold text-slate-500 tracking-[0.2em] flex items-center gap-2">
-          <CalendarIcon size={14} />{" "}
+          <CalendarIcon size={14} />
           {today.toLocaleString("default", { month: "long" }).toUpperCase()}
         </h2>
         <span className="text-xs font-mono text-slate-600">{currentYear}</span>
@@ -324,7 +339,6 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
               className={`aspect-square flex items-center justify-center text-xs font-mono border rounded-sm relative group ${bgClass}`}
             >
               {day}
-              {/* Tooltip for status */}
               {day && (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-max">
                   <div className="bg-black text-white text-[10px] px-2 py-1 rounded border border-slate-700">
@@ -351,7 +365,7 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
   );
 };
 
-// --- Default Data Structures ---
+// --- Default Data ---
 const defaultPlayer = {
   user_id: USER_ID,
   level: 1,
@@ -369,7 +383,6 @@ const defaultTasks: Task[] = [
 ];
 
 const App = () => {
-  // --- State ---
   const [player, setPlayer] = useState(defaultPlayer);
   const [tasks, setTasks] = useState<Task[]>(defaultTasks);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -382,8 +395,6 @@ const App = () => {
   const [newTaskType, setNewTaskType] = useState<keyof Stats>("STR");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // --- API Fetching Logic ---
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -399,9 +410,7 @@ const App = () => {
       const tasksData = await handleResponse(tasksRes);
       const historyData = await handleResponse(historyRes);
 
-      // Handle Player Data (uses the returned data or defaults)
       if (playerData) {
-        // Mapping DB columns (snake_case) to state properties (camelCase/object structure)
         const stats = {
           STR: parseInt(playerData.strength) || 10,
           AGI: parseInt(playerData.agility) || 10,
@@ -409,9 +418,9 @@ const App = () => {
           INT: parseInt(playerData.intellect) || 10,
           PRS: parseInt(playerData.persuasion) || 10,
         };
+
         setPlayer({
           ...defaultPlayer,
-          // Overwrite with DB values where available
           level: parseInt(playerData.level) || 1,
           currentExp: parseInt(playerData.current_exp) || 0,
           maxExp: parseInt(playerData.max_exp) || 100,
@@ -420,31 +429,25 @@ const App = () => {
           fatigue: parseInt(playerData.fatigue) || 0,
           stats: stats,
         });
-      } else {
-        // If handleResponse returned null (e.g., 404 or 204), use default
-        setPlayer(defaultPlayer);
       }
 
-      // Handle Tasks Data (using mock data structure until backend is fully implemented)
       if (tasksData && Array.isArray(tasksData) && tasksData.length > 0) {
         setTasks(tasksData as Task[]);
       } else {
         setTasks(defaultTasks);
       }
 
-      // Handle History Data
       if (historyData && Array.isArray(historyData)) {
         setHistory(historyData as HistoryEntry[]);
       } else {
         setHistory([]);
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      // Now errors will contain the non-JSON content or status
       console.error("API connection failed:", err);
       setError(
         `Failed to fetch data. Error: ${err.message}. Check Docker services and API routes.`
       );
-      // Fallback to mock data if API fails to prevent blank screen
       setPlayer(defaultPlayer);
       setTasks(defaultTasks);
     } finally {
@@ -456,33 +459,13 @@ const App = () => {
     fetchData();
   }, [fetchData]);
 
-  // --- UI Logic ---
-
   const showNotification = (title: string, message: string, type = "quest") => {
     setNotification({ title, message, type });
   };
 
-  const levelUp = () => {
-    // Placeholder for future API call (PUT /api/player/level-up)
-    setPlayer((prev) => ({
-      ...prev,
-      level: prev.level + 1,
-      currentExp: 0,
-      maxExp: Math.floor(prev.maxExp * 1.2),
-      hp: prev.maxHp + 10,
-      maxHp: prev.maxHp + 10,
-      fatigue: 0,
-    }));
-    showNotification(
-      "LEVEL UP!",
-      `You have reached Level ${player.level + 1}`,
-      "levelup"
-    );
-  };
-
   const addTask = () => {
     if (!newTaskTitle.trim()) return;
-    // Placeholder for future API call (POST /api/tasks)
+
     const newTask: Task = {
       id: Date.now(),
       title: newTaskTitle,
@@ -494,12 +477,10 @@ const App = () => {
   };
 
   const deleteTask = (id: number) => {
-    // Placeholder for future API call (DELETE /api/tasks/:id)
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
   const completeTask = (id: number) => {
-    // Placeholder for future API call (PUT /api/tasks/:id/complete and PUT /api/player/update-stats)
     const task = tasks.find((t) => t.id === id);
     if (!task || task.completed) return;
 
@@ -509,7 +490,6 @@ const App = () => {
     const newExp = player.currentExp + xpGain;
     const leveledUp = newExp >= player.maxExp;
 
-    // Simple local state update for stats and level
     const statKey = task.type;
     const newStats = { ...player.stats, [statKey]: player.stats[statKey] + 1 };
 
@@ -532,7 +512,6 @@ const App = () => {
   };
 
   const endDay = () => {
-    // Placeholder for future API call (POST /api/day/end)
     const incompleteTasks = tasks.filter((t) => !t.completed).length;
     let newHp = player.hp;
     let newFatigue = player.fatigue;
@@ -555,7 +534,6 @@ const App = () => {
       );
     }
 
-    // Reset tasks
     setTasks(tasks.map((t) => ({ ...t, completed: false })));
 
     setPlayer((prev) => ({
@@ -606,7 +584,6 @@ const App = () => {
         isLowHp ? "shadow-[inset_0_0_100px_rgba(220,38,38,0.5)]" : ""
       }`}
     >
-      {/* --- HUD Header --- */}
       <header className="p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           <div className="flex flex-col w-full md:w-1/2">
@@ -633,7 +610,7 @@ const App = () => {
                 label="FATIGUE"
               />
             </div>
-            {/* XP Bar */}
+
             <div className="w-full h-1 bg-slate-800 mt-1">
               <div
                 className="h-full bg-yellow-400"
@@ -662,13 +639,12 @@ const App = () => {
       </header>
 
       <main className="max-w-5xl mx-auto p-4 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* --- Left Column: Stats & Calendar --- */}
         <div className="md:col-span-1 space-y-6">
-          {/* Stats Panel */}
           <div className="bg-slate-900/40 p-6 border border-slate-800 backdrop-blur-sm">
             <h2 className="text-sm font-bold text-slate-500 mb-4 tracking-[0.2em] border-b border-slate-800 pb-2">
               ATTRIBUTES
             </h2>
+
             <StatRow
               icon={Shield}
               label="STRENGTH"
@@ -705,11 +681,9 @@ const App = () => {
             </div>
           </div>
 
-          {/* Calendar Component */}
           <Calendar history={history} />
         </div>
 
-        {/* --- Right Column: Tasks --- */}
         <div className="md:col-span-2">
           {isLowHp && (
             <div className="mb-4 p-4 bg-red-900/20 border border-red-500/50 flex items-center gap-3 animate-pulse">
@@ -722,7 +696,6 @@ const App = () => {
 
           <div className="bg-black/40 border border-blue-900/30 p-1">
             <div className="bg-slate-900/80 p-6 min-h-[500px] relative">
-              {/* Decorative corners */}
               <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-blue-500"></div>
               <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-blue-500"></div>
               <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-blue-500"></div>
@@ -746,6 +719,7 @@ const App = () => {
                   className="flex-1 bg-slate-800 border border-slate-700 text-white px-4 py-2 focus:outline-none focus:border-blue-500 text-sm font-mono"
                   onKeyPress={(e) => e.key === "Enter" && addTask()}
                 />
+
                 <select
                   value={newTaskType}
                   onChange={(e) =>
@@ -759,6 +733,7 @@ const App = () => {
                   <option value="INT">INT</option>
                   <option value="PRS">PRS</option>
                 </select>
+
                 <button
                   onClick={addTask}
                   className="bg-blue-600 hover:bg-blue-500 text-white p-2 transition-colors"
