@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  # ============================
+  # POSTGRES DATABASE
+  # ============================
   db:
     image: postgres:15
     container_name: leveling_db
@@ -13,6 +16,9 @@ services:
       - ./backend/schema.sql:/docker-entrypoint-initdb.d/init.sql
     restart: always
 
+  # ============================
+  # NODE BACKEND API
+  # ============================
   backend:
     build:
       context: ./backend
@@ -24,6 +30,9 @@ services:
       - db
     restart: always
 
+  # ============================
+  # FRONTEND (Vite Build)
+  # ============================
   frontend:
     build:
       context: ./frontend
@@ -33,15 +42,23 @@ services:
       - backend
     restart: always
 
+  # ============================
+  # NGINX REVERSE PROXY
+  # ============================
   reverse-proxy:
     image: nginx:stable-alpine
     container_name: main_proxy
+
+    # IMPORTANT:
+    # Synology reserves 80 + 443 → use 8080 instead.
     ports:
-      - "10.0.0.235:8080:80"
-      - "10.0.0.235:8443:443"
+      - "8080:80"
+
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      # Certificates ONLY NEEDED later when enabling HTTPS
       - ./nginx/certs:/etc/nginx/certs
+
     depends_on:
       - frontend
       - backend
