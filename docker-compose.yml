@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # The Postgres Database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: hunter
+      POSTGRES_PASSWORD: arise
+      POSTGRES_DB: system_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # The Node.js Backend API
+  api:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://hunter:arise@db:5432/system_db
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+
+volumes:
+  postgres_data:
