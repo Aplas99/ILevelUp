@@ -1,36 +1,33 @@
-# --- Stage 1: Build the React Application ---
-    FROM node:20-alpine AS builder
+# --- STAGE 1: Build the React Application ---
+FROM node:20-alpine AS builder
 
-    # Set the working directory
-    WORKDIR /app
-    
-    # Copy package.json and package-lock.json (if present) to leverage Docker cache
-    COPY package.json package.lock.json ./
-    
-    # Install dependencies (only for Node environment)
-    RUN npm install
-    
-    # Copy all source files
-    COPY . .
-    
-    # Run the build command (which includes TypeScript compilation thanks to package.json script)
-    RUN npm run build
-    
-    
-    # --- Stage 2: Serve the Static Files with Nginx ---
-    FROM nginx:alpine AS runner
-    
-    # Copy the built application from the builder stage into Nginx's html directory
-    COPY --from=builder /app/dist /usr/share/nginx/html
-    
-    # Remove the default Nginx configuration file
-    RUN rm /etc/nginx/conf.d/default.conf
-    
-    # Add a custom Nginx configuration to handle single-page application routing (index.html fallback)
-    COPY nginx.conf /etc/nginx/conf.d/default.conf
-    
-    # Expose the port Nginx will be listening on (default HTTP port)
-    EXPOSE 80
-    
-    # Command to start Nginx
-    CMD ["nginx", "-g", "daemon off;"]
+# Set the working directory inside the container
+WORKDIR /app
+
+# IMPORTANT FIX: Copy files from the 'client' subdirectory on the NAS
+# The build context root is ./frontend, so we copy from ./client/
+# The 'package-lock.json' file name is standard.
+COPY client/package.json client/package-lock.json ./
+
+# Install dependencies
+# Using npm ci ensures faster, consistent builds when a lock file is present
+RUN npm ci
+
+# Copy all other source code from the client directory
+COPY client/. .
+
+# Build the app (assuming 'npm run build' is defined in your package.json)
+RUN npm run build
+
+# --- STAGE 2: Serve the Built Application with Nginx ---
+FROM nginx:stable-alpine
+
+# Copy the built files from the builder stage to the Nginx serving directory
+# Assumes the build output is placed in /app/build (standard for Create React App/Vite)
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# The Nginx reverse proxy config is mounted separately in docker-compose.yml
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
