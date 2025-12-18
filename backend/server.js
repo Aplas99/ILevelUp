@@ -1,66 +1,88 @@
-// backend/server.js
-const express = require('express');
-const { Pool } = require('pg');
-const cors = require('cors');
+const express = require("express");
+const { Pool } = require("pg");
+const cors = require("cors");
 const app = express();
 
+// Standard CORS configuration
 app.use(cors());
 app.use(express.json());
 
+// Database connection using environment variables
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// Get User Status
-app.get('/api/status', async (req, res) => {
+// Verification endpoint to test DB connection from browser
+app.get("/api/health", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = 1');
+    const result = await pool.query("SELECT NOW()");
+    res.json({ status: "online", db: "connected", time: result.rows[0].now });
+  } catch (err) {
+    console.error("Database Connection Error:", err);
+    res.status(500).json({ status: "error", detail: err.message });
+  }
+});
+
+// Get User Status
+app.get("/api/status", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE id = 1");
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'System Error' });
+    res.status(500).json({ error: "System Error" });
   }
 });
 
 // Get Tasks
-app.get('/api/tasks', async (req, res) => {
+app.get("/api/tasks", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM tasks WHERE user_id = 1 ORDER BY id DESC');
+    const result = await pool.query(
+      "SELECT * FROM tasks WHERE user_id = 1 ORDER BY id DESC"
+    );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: 'System Error' });
+    console.error(err);
+    res.status(500).json({ error: "System Error" });
   }
 });
 
 // Add Task
-app.post('/api/tasks', async (req, res) => {
+app.post("/api/tasks", async (req, res) => {
   const { title, type } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (user_id, title, type) VALUES (1, $1, $2) RETURNING *',
+      "INSERT INTO tasks (user_id, title, type) VALUES (1, $1, $2) RETURNING *",
       [title, type]
     );
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'System Error' });
+    console.error(err);
+    res.status(500).json({ error: "System Error" });
   }
 });
 
-// Complete Task (Logic for XP gain would go here in a real app)
-app.put('/api/tasks/:id/complete', async (req, res) => {
+// Complete Task
+app.put("/api/tasks/:id/complete", async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      'UPDATE tasks SET completed = true WHERE id = $1 RETURNING *',
+      "UPDATE tasks SET completed = true WHERE id = $1 RETURNING *",
       [id]
     );
-    // TODO: Add logic here to update User XP and Stats via SQL transaction
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'System Error' });
+    console.error(err);
+    res.status(500).json({ error: "System Error" });
   }
 });
 
-app.listen(3000, () => {
-  console.log('System initialized on port 3000');
+// Bind to 0.0.0.0 to ensure the container is accessible externally
+const PORT = 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Accessible at http://[NAS_IP_ADDRESS]:${PORT}`);
 });
