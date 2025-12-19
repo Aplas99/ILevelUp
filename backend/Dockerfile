@@ -1,20 +1,21 @@
-# Use the official Node.js image
-FROM node:18-slim
+# Use the official Node.js 20 image as the base image
+FROM node:20
 
-# Create app directory
+# Create application directory
 WORKDIR /usr/src/app
 
-# Copy package files first (better for caching)
+# Copy package.json and package-lock.json to the container
+# This is done separately to leverage Docker caching for dependencies
 COPY package*.json ./
 
-# Install dependencies
+# Install application dependencies
 RUN npm install
 
-# Copy the rest of your server code
+# Copy the rest of the application source code
 COPY . .
 
-# Expose the port
+# Expose the port the app runs on
 EXPOSE 3000
 
-# Start the application
-CMD [ "npm", "start" ]
+# Command to run the application
+CMD [ "node", "server.js" ]
