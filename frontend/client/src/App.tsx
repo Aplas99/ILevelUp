@@ -38,6 +38,25 @@ interface HistoryEntry {
   total: number;
 }
 
+interface Player {
+  user_id: string;
+  level: number;
+  currentExp: number;
+  maxExp: number;
+  hp: number;
+  maxHp: number;
+  fatigue: number;
+  stats: {
+    STR: number;
+    AGI: number;
+    VIT: number;
+    INT: number;
+    PRS: number;
+  };
+}
+
+type PlayerType = Player | null;
+
 // --- FIXED Missing Prop Types ---
 interface ProgressBarProps {
   value: number;
@@ -365,10 +384,8 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
   );
 };
 
-
-
 const App = () => {
-  const [player, setPlayer] = useState<any>(null);
+  const [player, setPlayer] = useState<PlayerType>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [notification, setNotification] = useState<{
@@ -381,57 +398,57 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-      const fetchData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-          // Use the correct userId for fetching
-          const [playerRes, tasksRes, historyRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/player/${USER_ID}`),
-            fetch(`${API_BASE_URL}/tasks/${USER_ID}`), // Updated endpoint
-            fetch(`${API_BASE_URL}/history/${USER_ID}`), // New endpoint
-          ]);
-  
-          const playerData = await handleResponse(playerRes);
-          const tasksData = await handleResponse(tasksRes);
-          const historyData = await handleResponse(historyRes);
-  
-          if (playerData) {
-            setPlayer({
-              user_id: USER_ID, // Use the ID from configuration
-              level: parseInt(playerData.level) ?? 1,
-              currentExp: parseInt(playerData.current_exp) ?? 0,
-              maxExp: parseInt(playerData.max_exp) ?? 100,
-              hp: parseInt(playerData.current_hp) ?? 100,
-              maxHp: parseInt(playerData.max_hp) ?? 100,
-              fatigue: parseInt(playerData.fatigue) ?? 0,
-              stats: {
-                STR: parseInt(playerData.strength) ?? 10,
-                AGI: parseInt(playerData.agility) ?? 10,
-                VIT: parseInt(playerData.vitality) ?? 10,
-                INT: parseInt(playerData.intellect) ?? 10,
-                PRS: parseInt(playerData.persuasion) ?? 10,
-              },
-            });
-          } else {
-            setPlayer(null); // No player data, reset to null
-          }
-  
-          setTasks(tasksData && Array.isArray(tasksData) ? tasksData : []);
-          setHistory(historyData && Array.isArray(historyData) ? historyData : []);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-          console.error("API connection failed:", err);
-          setError(
-            `Failed to fetch data. Error: ${err.message}. Check Docker services and API routes.`
-          );
-          setPlayer(null); // On error, reset player and tasks
-          setTasks([]);
-          setHistory([]);
-        } finally {
-          setLoading(false);
-        }
-      }, []); // USER_ID is a constant, so no need to include in dependency array.
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Use the correct userId for fetching
+      const [playerRes, tasksRes, historyRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/player/${USER_ID}`),
+        fetch(`${API_BASE_URL}/tasks/${USER_ID}`), // Updated endpoint
+        fetch(`${API_BASE_URL}/history/${USER_ID}`), // New endpoint
+      ]);
+
+      const playerData = await handleResponse(playerRes);
+      const tasksData = await handleResponse(tasksRes);
+      const historyData = await handleResponse(historyRes);
+
+      if (playerData) {
+        setPlayer({
+          user_id: USER_ID, // Use the ID from configuration
+          level: parseInt(playerData.level) ?? 1,
+          currentExp: parseInt(playerData.current_exp) ?? 0,
+          maxExp: parseInt(playerData.max_exp) ?? 100,
+          hp: parseInt(playerData.current_hp) ?? 100,
+          maxHp: parseInt(playerData.max_hp) ?? 100,
+          fatigue: parseInt(playerData.fatigue) ?? 0,
+          stats: {
+            STR: parseInt(playerData.strength) ?? 10,
+            AGI: parseInt(playerData.agility) ?? 10,
+            VIT: parseInt(playerData.vitality) ?? 10,
+            INT: parseInt(playerData.intellect) ?? 10,
+            PRS: parseInt(playerData.persuasion) ?? 10,
+          },
+        });
+      } else {
+        setPlayer(null); // No player data, reset to null
+      }
+
+      setTasks(tasksData && Array.isArray(tasksData) ? tasksData : []);
+      setHistory(historyData && Array.isArray(historyData) ? historyData : []);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error("API connection failed:", err);
+      setError(
+        `Failed to fetch data. Error: ${err.message}. Check Docker services and API routes.`
+      );
+      setPlayer(null); // On error, reset player and tasks
+      setTasks([]);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // USER_ID is a constant, so no need to include in dependency array.
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -502,7 +519,9 @@ const App = () => {
 
       if (data) {
         setTasks((prevTasks) =>
-          prevTasks.map((t) => (t.id === id ? { ...data.task, completed: true } : t))
+          prevTasks.map((t) =>
+            t.id === id ? { ...data.task, completed: true } : t
+          )
         );
         setPlayer({
           user_id: USER_ID,
@@ -528,7 +547,11 @@ const App = () => {
             "levelup"
           );
         } else {
-          showNotification("Task Completed!", `You gained +25 EXP and +1 ${task.type} Stat.`, "quest");
+          showNotification(
+            "Task Completed!",
+            `You gained +25 EXP and +1 ${task.type} Stat.`,
+            "quest"
+          );
         }
       }
     } catch (error) {
@@ -576,8 +599,6 @@ const App = () => {
     }
   };
 
-  const isLowHp = player.hp / player.maxHp <= 0.5;
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-8">
@@ -610,6 +631,24 @@ const App = () => {
       </div>
     );
   }
+
+  if (!player) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-8">
+        <div className="text-orange-500 mb-4">
+          <Users size={48} />
+        </div>
+        <h1 className="text-xl font-mono tracking-widest text-orange-400">
+          PLAYER NOT FOUND
+        </h1>
+        <p className="text-sm text-slate-400 mt-2">
+          Could not retrieve player data. The user may not exist.
+        </p>
+      </div>
+    );
+  }
+
+  const isLowHp = player.hp / player.maxHp <= 0.5;
 
   return (
     <div
