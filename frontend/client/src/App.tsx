@@ -14,7 +14,7 @@ import {
 
 // --- Configuration ---
 const API_BASE_URL = "/api";
-const USER_ID = "Player1";
+const USER_ID = "1";
 
 // --- Type Definitions ---
 interface Stats {
@@ -365,23 +365,11 @@ const Calendar: React.FC<CalendarProps> = ({ history }) => {
   );
 };
 
-// --- Default Data ---
-const defaultPlayer = {
-  user_id: USER_ID,
-  level: 1,
-  currentExp: 0,
-  maxExp: 100,
-  hp: 100,
-  maxHp: 100,
-  fatigue: 0,
-  stats: { STR: 0, AGI: 0, VIT: 0, INT: 0, PRS: 0 },
-};
 
-const defaultTasks: Task[] = [];
 
 const App = () => {
-  const [player, setPlayer] = useState(defaultPlayer);
-  const [tasks, setTasks] = useState<Task[]>(defaultTasks);
+  const [player, setPlayer] = useState<any>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [notification, setNotification] = useState<{
     title: string;
@@ -393,65 +381,57 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [playerRes, tasksRes, historyRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/player/${USER_ID}`),
-        fetch(`${API_BASE_URL}/tasks/${USER_ID}`),
-        fetch(`${API_BASE_URL}/history/${USER_ID}`),
-      ]);
-
-      const playerData = await handleResponse(playerRes);
-      const tasksData = await handleResponse(tasksRes);
-      const historyData = await handleResponse(historyRes);
-
-      if (playerData) {
-        const stats = {
-          STR: parseInt(playerData.strength) || 10,
-          AGI: parseInt(playerData.agility) || 10,
-          VIT: parseInt(playerData.vitality) || 10,
-          INT: parseInt(playerData.intellect) || 10,
-          PRS: parseInt(playerData.persuasion) || 10,
-        };
-
-        setPlayer({
-          ...defaultPlayer,
-          level: parseInt(playerData.level) || 1,
-          currentExp: parseInt(playerData.current_exp) || 0,
-          maxExp: parseInt(playerData.max_exp) || 100,
-          hp: parseInt(playerData.current_hp) || 100,
-          maxHp: parseInt(playerData.max_hp) || 100,
-          fatigue: parseInt(playerData.fatigue) || 0,
-          stats: stats,
-        });
-      }
-
-      if (tasksData && Array.isArray(tasksData) && tasksData.length > 0) {
-        setTasks(tasksData as Task[]);
-      } else {
-        setTasks(defaultTasks);
-      }
-
-      if (historyData && Array.isArray(historyData)) {
-        setHistory(historyData as HistoryEntry[]);
-      } else {
-        setHistory([]);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("API connection failed:", err);
-      setError(
-        `Failed to fetch data. Error: ${err.message}. Check Docker services and API routes.`
-      );
-      setPlayer(defaultPlayer);
-      setTasks(defaultTasks);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+      const fetchData = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          // Use the correct userId for fetching
+          const [playerRes, tasksRes, historyRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/player/${USER_ID}`),
+            fetch(`${API_BASE_URL}/tasks/${USER_ID}`), // Updated endpoint
+            fetch(`${API_BASE_URL}/history/${USER_ID}`), // New endpoint
+          ]);
+  
+          const playerData = await handleResponse(playerRes);
+          const tasksData = await handleResponse(tasksRes);
+          const historyData = await handleResponse(historyRes);
+  
+          if (playerData) {
+            setPlayer({
+              user_id: USER_ID, // Use the ID from configuration
+              level: parseInt(playerData.level) ?? 1,
+              currentExp: parseInt(playerData.current_exp) ?? 0,
+              maxExp: parseInt(playerData.max_exp) ?? 100,
+              hp: parseInt(playerData.current_hp) ?? 100,
+              maxHp: parseInt(playerData.max_hp) ?? 100,
+              fatigue: parseInt(playerData.fatigue) ?? 0,
+              stats: {
+                STR: parseInt(playerData.strength) ?? 10,
+                AGI: parseInt(playerData.agility) ?? 10,
+                VIT: parseInt(playerData.vitality) ?? 10,
+                INT: parseInt(playerData.intellect) ?? 10,
+                PRS: parseInt(playerData.persuasion) ?? 10,
+              },
+            });
+          } else {
+            setPlayer(null); // No player data, reset to null
+          }
+  
+          setTasks(tasksData && Array.isArray(tasksData) ? tasksData : []);
+          setHistory(historyData && Array.isArray(historyData) ? historyData : []);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+          console.error("API connection failed:", err);
+          setError(
+            `Failed to fetch data. Error: ${err.message}. Check Docker services and API routes.`
+          );
+          setPlayer(null); // On error, reset player and tasks
+          setTasks([]);
+          setHistory([]);
+        } finally {
+          setLoading(false);
+        }
+      }, []); // USER_ID is a constant, so no need to include in dependency array.
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -460,84 +440,140 @@ const App = () => {
     setNotification({ title, message, type });
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!newTaskTitle.trim()) return;
 
-    const newTask: Task = {
-      id: Date.now(),
-      title: newTaskTitle,
-      type: newTaskType,
-      completed: false,
-    };
-    setTasks([...tasks, newTask]);
-    setNewTaskTitle("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: newTaskTitle,
+          type: newTaskType,
+          user_id: USER_ID, // Include user_id in the request
+        }),
+      });
+      const data = await handleResponse(response);
+
+      if (data) {
+        setTasks((prevTasks) => [...prevTasks, data]); // Add the task returned by the backend
+        setNewTaskTitle("");
+      }
+    } catch (error) {
+      console.error("Error adding task:", error);
+      showNotification("Error", "Failed to add task.", "error");
+    }
   };
 
-  const deleteTask = (id: number) => {
-    setTasks(tasks.filter((t) => t.id !== id));
+  const deleteTask = async (id: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        method: "DELETE",
+      });
+      // We don't necessarily need to parse the response if the backend sends minimal data
+      if (response.ok) {
+        setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
+        showNotification("Success", "Task deleted successfully.", "quest");
+      } else {
+        const errorData = await handleResponse(response);
+        throw new Error(errorData?.error || "Failed to delete task.");
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      showNotification("Error", "Failed to delete task.", "error");
+    }
   };
 
-  const completeTask = (id: number) => {
+  const completeTask = async (id: number) => {
     const task = tasks.find((t) => t.id === id);
     if (!task || task.completed) return;
 
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, completed: true } : t)));
+    try {
+      const response = await fetch(`${API_BASE_URL}/tasks/${id}/complete`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId: USER_ID }),
+      });
+      const data = await handleResponse(response);
 
-    const xpGain = 25;
-    const newExp = player.currentExp + xpGain;
-    const leveledUp = newExp >= player.maxExp;
+      if (data) {
+        setTasks((prevTasks) =>
+          prevTasks.map((t) => (t.id === id ? { ...data.task, completed: true } : t))
+        );
+        setPlayer({
+          user_id: USER_ID,
+          level: parseInt(data.player.level) ?? 1,
+          currentExp: parseInt(data.player.current_exp) ?? 0,
+          maxExp: parseInt(data.player.max_exp) ?? 100,
+          hp: parseInt(data.player.current_hp) ?? 100,
+          maxHp: parseInt(data.player.max_hp) ?? 100,
+          fatigue: parseInt(data.player.fatigue) ?? 0,
+          stats: {
+            STR: parseInt(data.player.strength) ?? 10,
+            AGI: parseInt(data.player.agility) ?? 10,
+            VIT: parseInt(data.player.vitality) ?? 10,
+            INT: parseInt(data.player.intellect) ?? 10,
+            PRS: parseInt(data.player.persuasion) ?? 10,
+          },
+        });
 
-    const statKey = task.type;
-    const newStats = { ...player.stats, [statKey]: player.stats[statKey] + 1 };
-
-    setPlayer((prev) => ({
-      ...prev,
-      currentExp: leveledUp ? newExp - prev.maxExp : newExp,
-      stats: newStats,
-      level: leveledUp ? prev.level + 1 : prev.level,
-      hp: leveledUp ? prev.maxHp + 10 : prev.hp,
-      maxHp: leveledUp ? prev.maxHp + 10 : prev.maxHp,
-    }));
-
-    if (leveledUp) {
-      showNotification(
-        "LEVEL UP!",
-        "All stats recovered. Capacity increased.",
-        "levelup"
-      );
+        if (data.leveledUp) {
+          showNotification(
+            "LEVEL UP!",
+            "All stats recovered. Capacity increased.",
+            "levelup"
+          );
+        } else {
+          showNotification("Task Completed!", `You gained +25 EXP and +1 ${task.type} Stat.`, "quest");
+        }
+      }
+    } catch (error) {
+      console.error("Error completing task:", error);
+      showNotification("Error", "Failed to complete task.", "error");
     }
   };
 
-  const endDay = () => {
-    const incompleteTasks = tasks.filter((t) => !t.completed).length;
-    let newHp = player.hp;
-    let newFatigue = player.fatigue;
+  const endDay = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/end-day/${USER_ID}`, {
+        method: "PUT",
+      });
+      const data = await handleResponse(response);
 
-    if (incompleteTasks > 0) {
-      newHp = Math.max(0, player.hp - incompleteTasks * 20);
-      newFatigue = Math.min(100, player.fatigue + 20);
-      showNotification(
-        "PENALTY",
-        `Failed ${incompleteTasks} Daily Quests. HP -${incompleteTasks * 20}`,
-        "warning"
-      );
-    } else {
-      newFatigue = Math.max(0, player.fatigue - 20);
-      newHp = Math.min(player.maxHp, player.hp + 10);
-      showNotification(
-        "DAILY COMPLETED",
-        "Good work. Fatigue reduced.",
-        "quest"
-      );
+      if (data && data.player) {
+        setPlayer({
+          user_id: USER_ID,
+          level: parseInt(data.player.level) ?? 1,
+          currentExp: parseInt(data.player.current_exp) ?? 0,
+          maxExp: parseInt(data.player.max_exp) ?? 100,
+          hp: parseInt(data.player.current_hp) ?? 100,
+          maxHp: parseInt(data.player.max_hp) ?? 100,
+          fatigue: parseInt(data.player.fatigue) ?? 0,
+          stats: {
+            STR: parseInt(data.player.strength) ?? 10,
+            AGI: parseInt(data.player.agility) ?? 10,
+            VIT: parseInt(data.player.vitality) ?? 10,
+            INT: parseInt(data.player.intellect) ?? 10,
+            PRS: parseInt(data.player.persuasion) ?? 10,
+          },
+        });
+        setTasks([]); // All tasks are reset by the backend
+        if (data.notification) {
+          showNotification(
+            data.notification.title,
+            data.notification.message,
+            data.notification.type
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error ending day:", error);
+      showNotification("Error", "Failed to end day.", "error");
     }
-
-    setTasks(tasks.map((t) => ({ ...t, completed: false })));
-
-    setPlayer((prev) => ({
-      ...prev,
-      hp: newHp,
-      fatigue: newFatigue,
-    }));
   };
 
   const isLowHp = player.hp / player.maxHp <= 0.5;
